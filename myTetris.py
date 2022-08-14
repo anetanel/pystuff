@@ -33,9 +33,8 @@ class Figure:
         [[1, 2, 5, 6]],
     ]
 
-    def __init__(self, x, y):
-        self.x = int(x)
-        self.y = int(y)
+    def __init__(self):
+        self.set_position(0, 0)
         self.type = random.randint(0, len(self.figures) - 1)
         self.color = random.randint(1, len(colors) - 1)
         self.rotation = 0
@@ -46,6 +45,10 @@ class Figure:
     def rotate(self):
         self.rotation = (self.rotation + 1) % len(self.figures[self.type])
 
+    def set_position(self, x, y):
+        self.x = x
+        self.y = y
+
 
 class Tetris:
     height = 0
@@ -55,14 +58,19 @@ class Tetris:
     y = 0
     field = []
     figure = None
+    next_figure = None
 
     def __init__(self, width, height):
+        self.state = "start"
         self.height = height
         self.width = width
         self.field = [[0] * width for _ in range(height)]
+        self.next_figure = Figure()
 
     def new_figure(self):
-        self.figure = Figure(self.width / 2 - 2, 0)
+        self.figure = self.next_figure
+        self.figure.set_position(self.width // 2 - 2, 0)
+        self.next_figure = Figure()
 
     def go_side(self, dx):
         old_x = self.figure.x
@@ -100,6 +108,8 @@ class Tetris:
                 if i * 4 + j in self.figure.image():
                     self.field[i + self.figure.y][j + self.figure.x] = self.figure.color
         self.new_figure()
+        if self.intersects():
+            self.state = "gameover"
 
     def go_space(self):
         while not self.intersects():
@@ -116,19 +126,30 @@ def main():
     pygame.display.set_caption("Tetris")
     game = Tetris(width=10, height=20)
     # set play-field to middle of screen horizontally
-    game.x = int(screen_size[0] / 2 - (game.width / 2 * game.block_size))
+    game.x = screen_size[0] // 2 - (game.width // 2 * game.block_size)
     # set play-field to bottom + 3 rows vertically
-    game.y = int(screen_size[1] - (game.height * game.block_size) - game.block_size * 3)
+    game.y = screen_size[1] - (game.height * game.block_size) - game.block_size * 3
     done = False
     pressing_down = False
     clock = pygame.time.Clock()
     fps = 15
+    counter = 0
+
+    # Text
+    font1 = pygame.font.SysFont('Calibri', 65, True, False)
+    text_game_over = font1.render("Game Over", True, (255, 125, 0))
 
     # Main game loop
     while not done:
+        if game.figure is None:
+            game.new_figure()
+        counter += 1
+        if counter > 100000:
+            counter = 0
 
-        if pressing_down:
-            game.go_down()
+        if counter % fps == 0 or pressing_down:
+            if game.state == "start":
+                game.go_down()
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -173,6 +194,14 @@ def main():
                                          [game.x + game.block_size * (j + game.figure.x) + 1,
                                           game.y + game.block_size * (i + game.figure.y) + 1,
                                           game.block_size - 2, game.block_size - 2])
+                    if p in game.next_figure.image():
+                        pygame.draw.rect(screen, colors[game.next_figure.color],
+                                         [game.block_size * (j + game.next_figure.x) + game.block_size * 2,
+                                          game.block_size * (i + game.next_figure.y) + game.block_size * 2,
+                                          game.block_size - 1, game.block_size - 1])
+        if game.state == "gameover":
+            screen.blit(text_game_over, [20, 200])
+            # screen.blit(text_game_over1, [25, 265])
         pygame.display.flip()
         clock.tick(fps)
 
