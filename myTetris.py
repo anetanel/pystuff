@@ -107,6 +107,7 @@ class Tetris:
             for j in range(4):
                 if i * 4 + j in self.figure.image():
                     self.field[i + self.figure.y][j + self.figure.x] = self.figure.color
+        self.break_lines()
         self.new_figure()
         if self.intersects():
             self.state = "gameover"
@@ -117,12 +118,20 @@ class Tetris:
         self.figure.y -= 1
         self.freeze()
 
+    def break_lines(self):
+        lines = 0
+        for i in range(1, self.height):
+            if 0 not in self.field[i]:
+                lines += 1
+                for i1 in range(i, 1, -1):
+                    self.field[i1] = self.field[i1 - 1]
+
 
 def main():
     # Initialize game
     pygame.init()
     screen_size = (800, 600)
-    screen = pygame.display.set_mode(size=screen_size)
+    screen = pygame.display.set_mode(size=screen_size, flags=pygame.SCALED)
     pygame.display.set_caption("Tetris")
     game = Tetris(width=10, height=20)
     # set play-field to middle of screen horizontally
