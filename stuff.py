@@ -1,16 +1,14 @@
-import random
-from enum import Enum
-
-
-class Colors(Enum):
-    BLACK = (0, 0, 0)
-    WHITE = (255, 255, 255)
-
-
-
 def main():
-    x = random.choice([i for i in Colors if i != Colors.WHITE])
-    print(x)
+    l1 = [1, 2, 3]
+    l2 = [4, 5, 6, ]
+    l1 = l2.copy()
+
+    print(l2)
+    print(l1)
+    l1[0] = "x"
+
+    print(l2)
+    print(l1)
 
 
 if __name__ == '__main__':

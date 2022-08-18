@@ -1,23 +1,7 @@
 import random
-from enum import Enum
+from enum import Enum, auto
 
 import pygame
-
-# # Define some UI colors
-# BLACK = (0, 0, 0)
-# WHITE = (255, 255, 255)
-# GRAY = (128, 128, 128)
-#
-# # Figures colors
-# colors = [
-#     (0, 0, 0),
-#     (120, 37, 179),
-#     (100, 179, 179),
-#     (80, 34, 22),
-#     (80, 134, 22),
-#     (180, 34, 22),
-#     (180, 34, 122),
-# ]
 
 
 class Colors(Enum):
@@ -30,19 +14,21 @@ class Colors(Enum):
     COLOR_4 = (80, 134, 22)
     COLOR_5 = (180, 34, 22)
     COLOR_6 = (180, 34, 122)
+    COLOR_7 = (255, 125, 0)
 
 
 class Direction(Enum):
-    DOWN = 1
-    LEFT = 2
-    RIGHT = 3
-    DROP = 4
-    ROTATE = 5
+    DOWN = auto()
+    LEFT = auto()
+    RIGHT = auto()
+    DROP = auto()
+    ROTATE = auto()
 
 
 class GameState(Enum):
-    RUNNING = 1
-    GAME_OVER = 2
+    RUNNING = auto()
+    GAME_OVER = auto()
+    PAUSE = auto()
 
 
 class Figure:
@@ -77,22 +63,19 @@ class Figure:
 
 
 class Tetris:
-    height = 0
-    width = 0
     block_size = 20
     x = 0
     y = 0
-    field = []
-    figure = None
-    next_figure = None
 
     def __init__(self, width, height):
+        self.score = 0
         self.state = GameState.RUNNING
         self.height = height
         self.width = width
         self.field = [[Colors.WHITE] * width for _ in range(height)]
         self.figure = None
         self.next_figure = Figure()
+        self.level = 1
 
     def new_figure(self):
         self.figure = self.next_figure
@@ -102,7 +85,6 @@ class Tetris:
     def move(self, direction: Direction):
         if self.state != GameState.RUNNING:
             return
-
         match direction:
             case Direction.DOWN:
                 self.go_down()
@@ -167,29 +149,33 @@ class Tetris:
             if Colors.WHITE not in self.field[i]:
                 lines += 1
                 for i1 in range(i, 1, -1):
-                    self.field[i1] = self.field[i1 - 1]
+                    self.field[i1] = self.field[i1 - 1].copy()
+        if (self.score % 10) + (lines ** 2) > 10:
+            self.level += 1
+        self.score += lines ** 2
 
 
 def main():
     # Initialize game
     pygame.init()
-    screen_size = (800, 600)
-    screen = pygame.display.set_mode(size=screen_size, flags=pygame.SCALED)
+    screen = pygame.display.set_mode(size=(SCREEN_WIDTH, SCREEN_HEIGHT), flags=pygame.SCALED)
     pygame.display.set_caption("Tetris")
     game = Tetris(width=10, height=20)
     # set play-field to middle of screen horizontally
-    game.x = screen_size[0] // 2 - (game.width // 2 * game.block_size)
+    game.x = SCREEN_WIDTH // 2 - (game.width // 2 * game.block_size)
     # set play-field to bottom + 3 rows vertically
-    game.y = screen_size[1] - (game.height * game.block_size) - game.block_size * 3
+    game.y = SCREEN_HEIGHT - (game.height * game.block_size) - game.block_size * 3
     done = False
     pressing_down = False
     clock = pygame.time.Clock()
-    fps = 15
+    fps = 25
     counter = 0
 
     # Text
-    font1 = pygame.font.SysFont('Calibri', 65, True, False)
-    text_game_over = font1.render("Game Over", True, (255, 125, 0))
+    small_font = pygame.font.SysFont('Calibri', 25, True, False)
+    large_font = pygame.font.SysFont('Calibri', 65, True, False)
+    text_game_over = large_font.render("Game Over", True, Colors.COLOR_7.value)
+    text_pause = large_font.render("PAUSE", True, Colors.GRAY.value)
 
     # Main game loop
     while not done:
@@ -199,7 +185,7 @@ def main():
         if counter > 100000:
             counter = 0
 
-        if counter % fps == 0 or pressing_down:
+        if counter % (fps // game.level) == 0 or pressing_down:
             game.move(Direction.DOWN)
 
         for event in pygame.event.get():
@@ -218,10 +204,16 @@ def main():
                     game.move(Direction.ROTATE)
                 elif event.key == pygame.K_SPACE:
                     game.move(Direction.DROP)
-                elif event.key == pygame.K_q:
-                    done = True
                 elif event.key == pygame.K_ESCAPE:
+                    done = True
+                elif event.key == pygame.K_r:
                     game.__init__(width=10, height=20)
+                elif event.key == pygame.K_p:
+                    if game.state == GameState.RUNNING:
+                        game.state = GameState.PAUSE
+                    elif game.state == GameState.PAUSE:
+                        game.state = GameState.RUNNING
+
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_DOWN:
                     pressing_down = False
@@ -233,13 +225,14 @@ def main():
         for y in range(game.height):
             for x in range(game.width):
                 # Draw grid
-                pygame.draw.rect(screen, Colors.GRAY.value, [game.x + game.block_size * x, game.y + (game.block_size * y),
-                                                game.block_size, game.block_size], 1)
+                pygame.draw.rect(screen, Colors.GRAY.value,
+                                 [game.x + game.block_size * x, game.y + (game.block_size * y),
+                                  game.block_size, game.block_size], 1)
                 # Draw frozen figures
-                # if game.field[y][x] != Colors.WHITE.name:
-                pygame.draw.rect(screen, game.field[y][x].value,
-                                 [game.x + (game.block_size * x) + 1, game.y + (game.block_size * y) + 1,
-                                  game.block_size - 2, game.block_size - 2])
+                if game.field[y][x] != Colors.WHITE.name:
+                    pygame.draw.rect(screen, game.field[y][x].value,
+                                     [game.x + (game.block_size * x) + 1, game.y + (game.block_size * y) + 1,
+                                      game.block_size - 2, game.block_size - 2])
 
         # Draw active figure with 1px offset in respect to grid
         if game.figure is not None:
@@ -254,13 +247,22 @@ def main():
                     # Draw next figure preview
                     if p in game.next_figure.image():
                         pygame.draw.rect(screen, game.next_figure.color.value,
-                                         [game.block_size * (j + game.next_figure.x) + game.block_size * 2,
-                                          game.block_size * (i + game.next_figure.y) + game.block_size * 2,
+                                         [game.block_size * (j + game.next_figure.x) + game.block_size * 5,
+                                          game.block_size * (i + game.next_figure.y) + game.block_size * 5,
                                           game.block_size - 1, game.block_size - 1])
+            # debug = small_font.render(f'y: {game.figure.y}, x: {game.figure.x}', True, Colors.BLACK.value)
 
+        # Blit text
         if game.state == GameState.GAME_OVER:
-            screen.blit(text_game_over, [20, 200])
-            # screen.blit(text_game_over1, [25, 265])
+            screen.blit(text_game_over, text_game_over.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)))
+        if game.state == GameState.PAUSE:
+            screen.blit(text_pause, text_pause.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)))
+        text_score = small_font.render("Score: " + str(game.score), True, Colors.BLACK.value)
+        text_level = small_font.render("Level: " + str(game.level), True, Colors.BLACK.value)
+        screen.blit(text_score, [0, 0])
+        screen.blit(text_level, [0, 30])
+
+        # screen.blit(debug, [0,0])
         pygame.display.flip()
         clock.tick(fps)
 
@@ -268,4 +270,6 @@ def main():
 
 
 if __name__ == '__main__':
+    SCREEN_WIDTH = 800
+    SCREEN_HEIGHT = 600
     main()
