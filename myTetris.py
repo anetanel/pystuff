@@ -2,6 +2,7 @@ import random
 from enum import Enum, auto
 
 import pygame
+from pygame import mixer
 
 
 class Colors(Enum):
@@ -17,6 +18,7 @@ class Colors(Enum):
     COLOR_7 = (255, 125, 0)
 
 
+# noinspection PyArgumentList
 class Direction(Enum):
     DOWN = auto()
     LEFT = auto()
@@ -25,6 +27,7 @@ class Direction(Enum):
     ROTATE = auto()
 
 
+# noinspection PyArgumentList
 class GameState(Enum):
     RUNNING = auto()
     GAME_OVER = auto()
@@ -76,6 +79,11 @@ class Tetris:
         self.figure = None
         self.next_figure = Figure()
         self.level = 1
+        # set play-field to middle of screen horizontally
+        self.x = SCREEN_WIDTH // 2 - (self.width // 2 * self.block_size)
+        # set play-field to bottom + 3 rows vertically
+        self.y = SCREEN_HEIGHT - (self.height * self.block_size) - self.block_size * 3
+        self.game_over = False
 
     def new_figure(self):
         self.figure = self.next_figure
@@ -98,6 +106,7 @@ class Tetris:
                 self.go_side(1)
 
     def go_side(self, dx):
+        sfx_move.play()
         old_x = self.figure.x
         self.figure.x += dx
         if self.intersects():
@@ -110,6 +119,7 @@ class Tetris:
             self.freeze()
 
     def rotate(self):
+        sfx_rotate.play()
         old_rotation = self.figure.rotation
         self.figure.rotate()
         if self.intersects():
@@ -134,6 +144,7 @@ class Tetris:
         return intersection
 
     def freeze(self):
+        sfx_drop.play()
         for i in range(4):
             for j in range(4):
                 if i * 4 + j in self.figure.image():
@@ -147,27 +158,27 @@ class Tetris:
         lines = 0
         for i in range(1, self.height):
             if Colors.WHITE not in self.field[i]:
+                sfx_break_line.play()
                 lines += 1
                 for i1 in range(i, 1, -1):
                     self.field[i1] = self.field[i1 - 1].copy()
-        if (self.score % 10) + (lines ** 2) > 10:
-            self.level += 1
         self.score += lines ** 2
+        self.level = self.score // 10 + 1
+
+
+def new_game():
+    mixer.music.play(loops=-1)
+    return Tetris(width=10, height=20)
 
 
 def main():
     # Initialize game
-    pygame.init()
     screen = pygame.display.set_mode(size=(SCREEN_WIDTH, SCREEN_HEIGHT), flags=pygame.SCALED)
     pygame.display.set_caption("Tetris")
-    game = Tetris(width=10, height=20)
-    # set play-field to middle of screen horizontally
-    game.x = SCREEN_WIDTH // 2 - (game.width // 2 * game.block_size)
-    # set play-field to bottom + 3 rows vertically
-    game.y = SCREEN_HEIGHT - (game.height * game.block_size) - game.block_size * 3
+    game = new_game()
+    clock = pygame.time.Clock()
     done = False
     pressing_down = False
-    clock = pygame.time.Clock()
     fps = 25
     counter = 0
 
@@ -207,12 +218,14 @@ def main():
                 elif event.key == pygame.K_ESCAPE:
                     done = True
                 elif event.key == pygame.K_r:
-                    game.__init__(width=10, height=20)
+                    game = new_game()
                 elif event.key == pygame.K_p:
                     if game.state == GameState.RUNNING:
                         game.state = GameState.PAUSE
+                        mixer.music.pause()
                     elif game.state == GameState.PAUSE:
                         game.state = GameState.RUNNING
+                        mixer.music.unpause()
 
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_DOWN:
@@ -222,17 +235,20 @@ def main():
         screen.fill(Colors.WHITE.value)
 
         # Draw play-field
+        pygame.draw.rect(screen, Colors.GRAY.value,
+                         [game.x - 1, game.y, game.block_size * game.width + 2,
+                          game.block_size * game.height + 2], 1)
         for y in range(game.height):
             for x in range(game.width):
                 # Draw grid
-                pygame.draw.rect(screen, Colors.GRAY.value,
-                                 [game.x + game.block_size * x, game.y + (game.block_size * y),
-                                  game.block_size, game.block_size], 1)
+                # pygame.draw.rect(screen, Colors.GRAY.value,
+                #                  [game.x + game.block_size * x, game.y + (game.block_size * y),
+                #                   game.block_size, game.block_size], 1)
                 # Draw frozen figures
                 if game.field[y][x] != Colors.WHITE.name:
                     pygame.draw.rect(screen, game.field[y][x].value,
                                      [game.x + (game.block_size * x) + 1, game.y + (game.block_size * y) + 1,
-                                      game.block_size - 2, game.block_size - 2])
+                                      game.block_size - 1, game.block_size - 1])
 
         # Draw active figure with 1px offset in respect to grid
         if game.figure is not None:
@@ -243,7 +259,7 @@ def main():
                         pygame.draw.rect(screen, game.figure.color.value,
                                          [game.x + game.block_size * (j + game.figure.x) + 1,
                                           game.y + game.block_size * (i + game.figure.y) + 1,
-                                          game.block_size - 2, game.block_size - 2])
+                                          game.block_size - 1, game.block_size - 1])
                     # Draw next figure preview
                     if p in game.next_figure.image():
                         pygame.draw.rect(screen, game.next_figure.color.value,
@@ -254,6 +270,10 @@ def main():
 
         # Blit text
         if game.state == GameState.GAME_OVER:
+            if not game.game_over:
+                mixer.music.stop()
+                sfx_game_over.play()
+                game.game_over = True
             screen.blit(text_game_over, text_game_over.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)))
         if game.state == GameState.PAUSE:
             screen.blit(text_pause, text_pause.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)))
@@ -270,6 +290,13 @@ def main():
 
 
 if __name__ == '__main__':
+    pygame.init()
+    mixer.music.load('sound/tetris-music.mp3')
+    sfx_move = mixer.Sound('sound/move.mp3')
+    sfx_rotate = mixer.Sound('sound/rotate.mp3')
+    sfx_drop = mixer.Sound('sound/drop.mp3')
+    sfx_game_over = mixer.Sound('sound/game_over.mp3')
+    sfx_break_line = mixer.Sound('sound/break_line.mp3')
     SCREEN_WIDTH = 800
     SCREEN_HEIGHT = 600
     main()
