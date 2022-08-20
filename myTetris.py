@@ -342,10 +342,11 @@ def main():
                                          [game.x + game.block_size * (j + game.figure.x) + 1,
                                           game.y + game.block_size * (i + game.figure.y) + 1,
                                           game.block_size - 1, game.block_size - 1])
-                        pygame.draw.rect(screen, Colors.RED.value,
-                                         [game.x + game.block_size * (j + game.figure.x) + 1,
-                                          game.y + game.block_size * (i + game.figure.y) + 50,
-                                          game.block_size - 1, game.block_size - 1], 1)
+                        # Draw "ghost" figure
+                        # pygame.draw.rect(screen, Colors.RED.value,
+                        #                  [game.x + game.block_size * (j + game.figure.x) + 1,
+                        #                   game.y + game.block_size * (i + game.figure.y) + 50,
+                        #                   game.block_size - 1, game.block_size - 1], 1)
 
                     # Draw next figure preview
                     if p in game.next_figure.image():
