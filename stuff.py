@@ -1,15 +1,17 @@
-def main():
-    l1 = [1, 2, 3]
-    l2 = [4, 5, 6, ]
-    l1 = l2.copy()
+# Importing the library
+import pygame
 
-    print(l2)
-    print(l1)
-    l1[0] = "x"
+# Initializing Pygame
+pygame.init()
 
-    print(l2)
-    print(l1)
+# Initializing surface
+surface = pygame.display.set_mode((400,300))
 
+# Initialing Color
+color = (255,0,0)
 
-if __name__ == '__main__':
-    main()
+# Drawing Rectangle
+pygame.draw.rect(surface, color, pygame.Rect(30, 30, 60, 60))
+pygame.display.flip()
+while True:
+    pass
