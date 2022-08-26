@@ -403,15 +403,20 @@ def main():
                         mixer.music.unpause()
                 elif event.key == pygame.K_ESCAPE:
                     if main_menu.is_enabled():
-                        main_menu.get_current().close()
+                        if main_menu.get_current() == main_menu:
+                            main_menu.disable()
+                        else:
+                            main_menu.get_current().close()
+                            main_menu.enable()
+                    else:
                         main_menu.enable()
                 elif event.key == pygame.K_r:
                     game = new_game()
-                elif event.key == pygame.K_F1:
-                    if main_menu.is_enabled():
-                        main_menu.disable()
-                    else:
-                        main_menu.enable()
+                # elif event.key == pygame.K_F1:
+                #     if main_menu.is_enabled():
+                #         main_menu.disable()
+                #     else:
+                #         main_menu.enable()
                 elif event.key == pygame.K_g:
                     toggle_grid()
                 elif event.key == pygame.K_h:
@@ -485,7 +490,7 @@ def main():
             screen.blit(text_pause, text_pause.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)))
         text_score = small_font.render("Score: " + str(game.score), True, Colors.BLACK.value)
         text_level = small_font.render("Level: " + str(game.level), True, Colors.BLACK.value)
-        text_help = small_font.render("F1: Menu", True, Colors.GRAY.value)
+        text_help = small_font.render("<Esc>: Menu", True, Colors.GRAY.value)
         screen.blit(text_score, [0, 0])
         screen.blit(text_level, [0, text_score.get_size()[1] * 1.5])
         screen.blit(text_help, [0, SCREEN_HEIGHT - text_help.get_size()[1]])
@@ -533,7 +538,7 @@ ABOUT = [f'{__title__} {__version__}',
          '',
          f'Email: {__email__}']
 
-HELP = ['F1 : Toggle Main Menu',
+HELP = ['ESC : Main Menu',
         'R : Restart Game',
         'P : Pause Game',
         'F : Toggle Full Screen',
