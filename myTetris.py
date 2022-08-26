@@ -1,5 +1,6 @@
 import random
 from enum import Enum, auto
+from typing import Tuple
 
 import pygame
 from pygame import mixer
@@ -178,6 +179,13 @@ class Tetris:
         self.score += lines ** 2
         self.level = self.score // 10 + 1
 
+    def resize(self):
+        self.block_size = int(SCREEN_WIDTH * 0.02)
+        # set play-field to middle of screen horizontally
+        self.x = SCREEN_WIDTH // 2 - (self.width // 2 * self.block_size)
+        # set play-field to bottom + 3 rows vertically
+        self.y = int(SCREEN_HEIGHT - (self.height * self.block_size) - self.block_size * 3)
+
 
 def new_game():
     mixer.music.play(loops=-1)
@@ -210,11 +218,130 @@ def main():
         settings_menu.get_widget(widget_id='fullscreen_toggle').set_value(fullscreen)
         pygame.display.toggle_fullscreen()
 
+    def change_window_size(selected: Tuple, new_width, new_height) -> None:
+        global SCREEN_WIDTH
+        global SCREEN_HEIGHT
+        global screen
+        global small_font
+        global large_font
+        SCREEN_WIDTH = new_width
+        SCREEN_HEIGHT = new_height
+        screen = new_screen()
+        game.resize()
+        small_font = pygame.font.SysFont('Calibri', int(SCREEN_WIDTH * 0.02), True, False)
+        large_font = pygame.font.SysFont('Calibri', int(SCREEN_WIDTH * 0.1), True, False)
+        create_menus(resize=True)
+
+    def new_screen():
+        return pygame.display.set_mode(size=(SCREEN_WIDTH, SCREEN_HEIGHT),
+                                       flags=(pygame.FULLSCREEN if fullscreen else False))
+
+    def create_menus(resize=False):
+        global main_menu, settings_menu, help_menu, about_menu, quit_menu
+
+        theme = pygame_menu.themes.THEME_DEFAULT.copy()
+        # theme.widget_font_size = int(SCREEN_HEIGHT * 0.045)
+        # theme.title_font_size = int(SCREEN_HEIGHT * 0.05)
+        theme.set_background_color_opacity(0.8)
+
+        if resize:
+            for menu in main_menu, settings_menu, help_menu, about_menu, quit_menu:
+                menu.resize(width=SCREEN_WIDTH, height=SCREEN_HEIGHT)
+                for widget in menu.get_widgets():
+                    fi = widget.get_font_info()
+                    widget.set_font(fi['name'], int(SCREEN_HEIGHT * 0.05), fi['color'], fi['selected_color'],
+                                    fi['readonly_color'], fi['readonly_selected_color'], fi['background_color'])
+            return
+
+        main_menu = pygame_menu.Menu(
+            center_content=True,
+            height=SCREEN_HEIGHT,
+            theme=theme,
+            title='Tetris - Main Menu',
+            width=SCREEN_WIDTH,
+            onclose=pygame_menu.events.NONE,
+            mouse_visible=False
+        )
+
+        about_menu = pygame_menu.Menu(
+            center_content=True,
+            height=main_menu.get_height(),
+            mouse_visible=False,
+            title='About',
+            width=main_menu.get_width(),
+            theme=main_menu.get_theme(),
+            onclose=pygame_menu.events.BACK
+        )
+        for m in ABOUT:
+            about_menu.add.label(m, margin=(0, 0))
+        about_menu.add.label('')
+        about_menu.add.button('Return to Menu', pygame_menu.events.BACK)
+
+        help_menu = pygame_menu.Menu(
+            center_content=True,
+            height=main_menu.get_height(),
+            mouse_visible=False,
+            title='Help',
+            width=main_menu.get_width(),
+            theme=main_menu.get_theme(),
+            onclose=pygame_menu.events.BACK
+        )
+        help_menu.add.label('Keys', underline=True, underline_width=5).set_font_shadow(enabled=True)
+        for m in HELP:
+            help_menu.add.label(m, align=pygame_menu.locals.ALIGN_LEFT)
+        help_menu.add.label('')
+        help_menu.add.button('Return to Menu', pygame_menu.events.BACK)
+
+        settings_menu = pygame_menu.Menu(
+            center_content=True,
+            height=main_menu.get_height(),
+            mouse_visible=False,
+            title='Settings',
+            width=main_menu.get_width(),
+            theme=main_menu.get_theme(),
+            onclose=pygame_menu.events.BACK
+        )
+        settings_menu.add.selector(title='Window Size: ', items=RESOLUTIONS, onchange=change_window_size)
+        settings_menu.add.range_slider(title='Music Volume: ', default=MUSIC_DEFAULT, range_values=[*range(0, 11)],
+                                       onchange=set_music_volume, range_text_value_enabled=False)
+        settings_menu.add.range_slider(title='SFX Volume: ', default=SFX_DEFAULT, range_values=[*range(0, 11)],
+                                       onchange=set_sfx_volume, range_text_value_enabled=False)
+        settings_menu.add.toggle_switch("Full Screen", default=fullscreen, onchange=toggle_fullscreen,
+                                        toggleswitch_id='fullscreen_toggle')
+        settings_menu.add.toggle_switch("Grid", default=draw_grid, onchange=toggle_grid,
+                                        toggleswitch_id='grid_toggle')
+        settings_menu.add.toggle_switch("Ghost Piece", default=show_ghost, onchange=toggle_ghost,
+                                        toggleswitch_id='ghost_toggle')
+        settings_menu.add.label('')
+        settings_menu.add.button('Return to Menu', pygame_menu.events.BACK)
+
+        quit_menu = pygame_menu.Menu(
+            center_content=True,
+            height=main_menu.get_height(),
+            mouse_visible=False,
+            title='Quit?',
+            width=main_menu.get_width(),
+            theme=main_menu.get_theme(),
+            onclose=pygame_menu.events.BACK
+        )
+        quit_menu.add.label('Do you want to quit?')
+        quit_menu.add.button('NO', pygame_menu.events.BACK)
+        quit_menu.add.button('YES', pygame_menu.events.EXIT)
+
+        main_menu.add.button('Play', main_menu.disable)
+        main_menu.add.button(settings_menu.get_title(), settings_menu)
+        main_menu.add.button(help_menu.get_title(), help_menu)
+        main_menu.add.button(about_menu.get_title(), about_menu)
+        main_menu.add.button(quit_menu.get_title(), quit_menu)
+
     # Initialize game
     global fullscreen
     global draw_grid
     global show_ghost
-    screen = pygame.display.set_mode(size=(SCREEN_WIDTH, SCREEN_HEIGHT), flags=(pygame.FULLSCREEN if fullscreen else False) | pygame.SCALED)
+    global screen
+    global SCREEN_WIDTH
+    global SCREEN_HEIGHT
+    screen = new_screen()
     pygame.display.set_caption("Tetris")
     game = new_game()
     clock = pygame.time.Clock()
@@ -226,91 +353,19 @@ def main():
     set_music_volume(MUSIC_DEFAULT)
     set_sfx_volume(SFX_DEFAULT, play=False)
 
-    main_menu = pygame_menu.Menu(
-        center_content=True,
-        height=SCREEN_HEIGHT,
-        theme=theme,
-        title='Tetris - Main Menu',
-        width=SCREEN_WIDTH,
-        onclose=pygame_menu.events.NONE
-    )
-
-    about_menu = pygame_menu.Menu(
-        center_content=True,
-        height=main_menu.get_height(),
-        mouse_visible=False,
-        title='About',
-        width=main_menu.get_width(),
-        theme=main_menu.get_theme(),
-        onclose=pygame_menu.events.BACK
-    )
-    for m in ABOUT:
-        about_menu.add.label(m, margin=(0, 0))
-    about_menu.add.label('')
-    about_menu.add.button('Return to Menu', pygame_menu.events.BACK)
-
-    help_menu = pygame_menu.Menu(
-        center_content=True,
-        height=main_menu.get_height(),
-        mouse_visible=False,
-        title='Help',
-        width=main_menu.get_width(),
-        theme=main_menu.get_theme(),
-        onclose=pygame_menu.events.BACK
-    )
-    help_menu.add.label('Keys', underline=True, underline_width=10).set_font_shadow(enabled=True)
-    for m in HELP:
-        help_menu.add.label(m, align=pygame_menu.locals.ALIGN_LEFT)
-    help_menu.add.label('')
-    help_menu.add.button('Return to Menu', pygame_menu.events.BACK)
-
-    settings_menu = pygame_menu.Menu(
-        center_content=True,
-        height=main_menu.get_height(),
-        mouse_visible=False,
-        title='Settings',
-        width=main_menu.get_width(),
-        theme=main_menu.get_theme(),
-        onclose=pygame_menu.events.BACK
-    )
-    settings_menu.add.range_slider(title='Music Volume: ', default=MUSIC_DEFAULT, range_values=[*range(0, 11)],
-                                   onchange=set_music_volume, range_text_value_enabled=False)
-    settings_menu.add.range_slider(title='SFX Volume: ', default=SFX_DEFAULT, range_values=[*range(0, 11)],
-                                   onchange=set_sfx_volume, range_text_value_enabled=False)
-    settings_menu.add.toggle_switch("Full Screen", default=fullscreen, onchange=toggle_fullscreen,
-                                    toggleswitch_id='fullscreen_toggle')
-    settings_menu.add.toggle_switch("Grid", default=draw_grid, onchange=toggle_grid,
-                                    toggleswitch_id='grid_toggle')
-    settings_menu.add.toggle_switch("Ghost Piece", default=show_ghost, onchange=toggle_ghost,
-                                    toggleswitch_id='ghost_toggle')
-    settings_menu.add.label('')
-    settings_menu.add.button('Return to Menu', pygame_menu.events.BACK)
-
-    quit_menu = pygame_menu.Menu(
-        center_content=True,
-        height=main_menu.get_height(),
-        mouse_visible=False,
-        title='Quit?',
-        width=main_menu.get_width(),
-        theme=main_menu.get_theme(),
-        onclose=pygame_menu.events.BACK
-    )
-    quit_menu.add.label('Do you want to quit?')
-    quit_menu.add.button('NO', pygame_menu.events.BACK)
-    quit_menu.add.button('YES', pygame_menu.events.EXIT)
-
-    main_menu.add.button('Play', main_menu.disable)
-    main_menu.add.button(settings_menu.get_title(), settings_menu)
-    main_menu.add.button(help_menu.get_title(), help_menu)
-    main_menu.add.button(about_menu.get_title(), about_menu)
-    main_menu.add.button(quit_menu.get_title(), quit_menu)
+    # Create menus
+    global main_menu
+    global settings_menu
+    global help_menu
+    global about_menu
+    create_menus()
+    main_menu.enable()
 
     # Text
+    global small_font
+    global large_font
     small_font = pygame.font.SysFont('Calibri', int(SCREEN_WIDTH * 0.02), True, False)
     large_font = pygame.font.SysFont('Calibri', int(SCREEN_WIDTH * 0.1), True, False)
-    text_game_over1 = large_font.render("Game Over", True, Colors.WHITE.value, Colors.BLACK.value)
-    text_game_over2 = small_font.render("Press 'r' to Restart...", True, Colors.WHITE.value, Colors.BLACK.value)
-    text_pause = large_font.render("PAUSE", True, Colors.BLACK.value, Colors.GRAY.value)
 
     # Main game loop
     while not done:
@@ -418,12 +473,15 @@ def main():
                 mixer.music.stop()
                 sfx['game_over'].play()
                 game.game_over = True
+            text_game_over1 = large_font.render("Game Over", True, Colors.WHITE.value, Colors.BLACK.value)
+            text_game_over2 = small_font.render("Press 'r' to Restart...", True, Colors.WHITE.value, Colors.BLACK.value)
             screen.blit(text_game_over1, text_game_over1.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)))
             screen.blit(text_game_over2, text_game_over2.get_rect(
                 center=(SCREEN_WIDTH / 2,
                         SCREEN_HEIGHT / 2 + text_game_over1.get_size()[1] / 2 + text_game_over2.get_size()[1] / 2)
             ))
         if game.state == GameState.PAUSE:
+            text_pause = large_font.render("PAUSE", True, Colors.BLACK.value, Colors.GRAY.value)
             screen.blit(text_pause, text_pause.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)))
         text_score = small_font.render("Score: " + str(game.score), True, Colors.BLACK.value)
         text_level = small_font.render("Level: " + str(game.level), True, Colors.BLACK.value)
@@ -464,6 +522,12 @@ sfx = {
 SCREEN_WIDTH = pygame.display.Info().current_w
 SCREEN_HEIGHT = pygame.display.Info().current_h
 
+global main_menu
+global settings_menu
+global help_menu
+global about_menu
+global quit_menu
+
 ABOUT = [f'{__title__} {__version__}',
          f'Author: {__author__}',
          '',
@@ -479,16 +543,24 @@ HELP = ['F1 : Toggle Main Menu',
         'UP : Rotate Piece',
         'SPACE : Drop Piece'
         ]
-theme = pygame_menu.themes.THEME_DEFAULT.copy()
-theme.widget_font_size = int(SCREEN_HEIGHT * 0.045)
-theme.title_font_size = int(SCREEN_HEIGHT * 0.05)
-theme.set_background_color_opacity(0.8)
+
 draw_grid = False
 show_ghost = False
 fullscreen = False
 
 MUSIC_DEFAULT = 6
 SFX_DEFAULT = 5
+
+RESOLUTIONS = [('Full Screen Resolution', SCREEN_WIDTH, SCREEN_HEIGHT),
+               ('800x600', 800, 600),
+               ('1024x768', 1024, 768),
+               ('1366x768', 1366, 768),
+               ('1440x900', 1440, 900),
+               ('1920x1080', 1920, 1080),
+               ('2560x1440', 2560, 1440)]
+screen = None
+small_font = pygame.font.SysFont('Calibri', int(SCREEN_WIDTH * 0.02), True, False)
+large_font = pygame.font.SysFont('Calibri', int(SCREEN_WIDTH * 0.1), True, False)
 
 if __name__ == '__main__':
     main()
