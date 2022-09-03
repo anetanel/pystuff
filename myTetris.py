@@ -1,3 +1,16 @@
+"""
+myTetris by Netanel Attali
+Based on https://levelup.gitconnected.com/writing-tetris-in-python-2a16bddb5318
+
+TODO:
+* Add a frame around "Next Piece" - Done
+* Use backgrounds:
+    Make Play field semi-transparent - Done
+    Resize bg to fit screen - Done
+* Change music tempo
+* Add new music?
+"""
+
 import random
 from enum import Enum, auto
 from typing import Tuple
@@ -9,7 +22,7 @@ import pygame_menu
 
 class Colors(Enum):
     BLACK = (1, 1, 1)
-    WHITE = (255, 255, 255)
+    WHITE = (255, 255, 255, 220)
     GRAY = (128, 128, 128)
     COLOR_1 = (120, 37, 179)
     COLOR_2 = (100, 179, 179)
@@ -177,7 +190,7 @@ class Tetris:
                 for i1 in range(i, 1, -1):
                     self.field[i1] = self.field[i1 - 1].copy()
         self.score += lines ** 2
-        self.level = self.score // 10 + 1
+        self.level = self.score // 3 + 1
 
     def resize(self):
         self.block_size = int(SCREEN_WIDTH * 0.02)
@@ -192,6 +205,17 @@ def new_game():
     return Tetris(width=10, height=20)
 
 
+def text_drop_shadow(font, message, offset, fontcolor, shadowcolor):
+    base = font.render(message, 0, fontcolor)
+    size = base.get_width() + offset, base.get_height() + offset
+    img = pygame.Surface(size, pygame.SRCALPHA)
+    base.set_palette_at(1, shadowcolor)
+    img.blit(base, (offset, offset))
+    base.set_palette_at(1, fontcolor)
+    img.blit(base, (0, 0))
+    return img
+
+
 def main():
     def set_music_volume(value):
         pygame.mixer.music.set_volume(value / 10)
@@ -203,7 +227,7 @@ def main():
             sfx['game_over'].play()
 
     def toggle_grid(_=None):
-        global draw_grid
+        global draw_grid, next_rect
         draw_grid = not draw_grid
         settings_menu.get_widget(widget_id='grid_toggle').set_value(draw_grid)
 
@@ -224,33 +248,36 @@ def main():
         global screen
         global small_font
         global large_font
+        global alpha_surface
+        global bg
         SCREEN_WIDTH = new_width
         SCREEN_HEIGHT = new_height
         screen = new_screen()
+        alpha_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         game.resize()
         small_font = pygame.font.SysFont('Calibri', int(SCREEN_WIDTH * 0.02), True, False)
         large_font = pygame.font.SysFont('Calibri', int(SCREEN_WIDTH * 0.1), True, False)
         create_menus(resize=True)
+        bg = prepare_backgrounds()
 
     def new_screen():
-        return pygame.display.set_mode(size=(SCREEN_WIDTH, SCREEN_HEIGHT),
-                                       flags=(pygame.FULLSCREEN if fullscreen else False))
+        return pygame.display.set_mode(size=(SCREEN_WIDTH, SCREEN_HEIGHT))
 
     def create_menus(resize=False):
         global main_menu, settings_menu, help_menu, about_menu, quit_menu
 
         theme = pygame_menu.themes.THEME_DEFAULT.copy()
-        # theme.widget_font_size = int(SCREEN_HEIGHT * 0.045)
-        # theme.title_font_size = int(SCREEN_HEIGHT * 0.05)
+        theme.widget_font_size = int(SCREEN_HEIGHT * 0.045)
         theme.set_background_color_opacity(0.8)
 
         if resize:
             for menu in main_menu, settings_menu, help_menu, about_menu, quit_menu:
                 menu.resize(width=SCREEN_WIDTH, height=SCREEN_HEIGHT)
                 for widget in menu.get_widgets():
-                    fi = widget.get_font_info()
-                    widget.set_font(fi['name'], int(SCREEN_HEIGHT * 0.05), fi['color'], fi['selected_color'],
-                                    fi['readonly_color'], fi['readonly_selected_color'], fi['background_color'])
+                    if isinstance(widget, pygame_menu.widgets.widget.toggleswitch.ToggleSwitch):
+                        widget._state_text_font_size = None
+                    widget.update_font({'size': int(SCREEN_HEIGHT * 0.045)})
+
             return
 
         main_menu = pygame_menu.Menu(
@@ -306,11 +333,11 @@ def main():
                                        onchange=set_music_volume, range_text_value_enabled=False)
         settings_menu.add.range_slider(title='SFX Volume: ', default=SFX_DEFAULT, range_values=[*range(0, 11)],
                                        onchange=set_sfx_volume, range_text_value_enabled=False)
-        settings_menu.add.toggle_switch("Full Screen", default=fullscreen, onchange=toggle_fullscreen,
+        settings_menu.add.toggle_switch(title="Full Screen", default=fullscreen, onchange=toggle_fullscreen,
                                         toggleswitch_id='fullscreen_toggle')
-        settings_menu.add.toggle_switch("Grid", default=draw_grid, onchange=toggle_grid,
+        settings_menu.add.toggle_switch(title="Grid", default=draw_grid, onchange=toggle_grid,
                                         toggleswitch_id='grid_toggle')
-        settings_menu.add.toggle_switch("Ghost Piece", default=show_ghost, onchange=toggle_ghost,
+        settings_menu.add.toggle_switch(title="Ghost Piece", default=show_ghost, onchange=toggle_ghost,
                                         toggleswitch_id='ghost_toggle')
         settings_menu.add.label('')
         settings_menu.add.button('Return to Menu', pygame_menu.events.BACK)
@@ -341,7 +368,9 @@ def main():
     global screen
     global SCREEN_WIDTH
     global SCREEN_HEIGHT
+    global alpha_surface
     screen = new_screen()
+    alpha_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
     pygame.display.set_caption("Tetris")
     game = new_game()
     clock = pygame.time.Clock()
@@ -349,6 +378,7 @@ def main():
     pressing_down = False
     fps = 25
     counter = 0
+    next_rect = None
 
     set_music_volume(MUSIC_DEFAULT)
     set_sfx_volume(SFX_DEFAULT, play=False)
@@ -412,11 +442,6 @@ def main():
                         main_menu.enable()
                 elif event.key == pygame.K_r:
                     game = new_game()
-                # elif event.key == pygame.K_F1:
-                #     if main_menu.is_enabled():
-                #         main_menu.disable()
-                #     else:
-                #         main_menu.enable()
                 elif event.key == pygame.K_g:
                     toggle_grid()
                 elif event.key == pygame.K_h:
@@ -429,12 +454,16 @@ def main():
                     pressing_down = False
 
         # Prepare frame
-        screen.fill(Colors.WHITE.value)
+        screen.fill("white")
+        screen.blit(bg[(game.level - 1) % len(bg)], (0, 0))
+        screen.blit(alpha_surface, (0, 0))
 
         # Draw play-field
-        pygame.draw.rect(screen, Colors.GRAY.value,
-                         [game.x - 1, game.y, game.block_size * game.width + 2,
-                          game.block_size * game.height + 2], 1)
+        play_field_rect = pygame.draw.rect(alpha_surface, Colors.WHITE.value,
+                                           [game.x - 1, game.y, game.block_size * game.width + 2,
+                                            game.block_size * game.height + 2])
+        pygame.draw.rect(screen, Colors.GRAY.value, play_field_rect, 1)
+
         for y in range(game.height):
             for x in range(game.width):
                 # Draw grid
@@ -443,10 +472,16 @@ def main():
                                      [game.x + game.block_size * x + 1, game.y + (game.block_size * y),
                                       game.block_size, game.block_size], 1)
                 # Draw frozen figures
-                if game.field[y][x] != Colors.WHITE.name:
+                if game.field[y][x] != Colors.WHITE:
                     pygame.draw.rect(screen, game.field[y][x].value,
                                      [game.x + (game.block_size * x) + 1, game.y + (game.block_size * y) + 1,
                                       game.block_size - 1, game.block_size - 1])
+
+        # Draw Next Figure frame
+        next_rect = pygame.draw.rect(alpha_surface, Colors.WHITE.value,
+                                     [game.x - game.block_size * 10, game.y, game.block_size * 6,
+                                      game.block_size * 6])
+        pygame.draw.rect(screen, "red4", next_rect, 5)
 
         # Draw active figure with 1px offset in respect to grid
         if game.figure is not None:
@@ -468,8 +503,10 @@ def main():
                     # Draw next figure preview
                     if p in game.next_figure.image():
                         pygame.draw.rect(screen, game.next_figure.color.value,
-                                         [game.block_size * (j + game.next_figure.x) + game.block_size * 5,
-                                          game.block_size * (i + game.next_figure.y) + game.block_size * 5,
+                                         [game.block_size * (j + game.next_figure.x)
+                                          + next_rect.centerx - game.block_size * 2,
+                                          game.block_size * (i + game.next_figure.y)
+                                          + next_rect.centery - game.block_size * 2,
                                           game.block_size - 1, game.block_size - 1])
 
         # Blit text
@@ -488,12 +525,17 @@ def main():
         if game.state == GameState.PAUSE:
             text_pause = large_font.render("PAUSE", True, Colors.BLACK.value, Colors.GRAY.value)
             screen.blit(text_pause, text_pause.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)))
-        text_score = small_font.render("Score: " + str(game.score), True, Colors.BLACK.value)
-        text_level = small_font.render("Level: " + str(game.level), True, Colors.BLACK.value)
-        text_help = small_font.render("<Esc>: Menu", True, Colors.GRAY.value)
+        text_score = text_drop_shadow(small_font, "Score: " + str(game.score), 5, Colors.WHITE.value,
+                                      Colors.BLACK.value)
+        text_level = text_drop_shadow(small_font, "Level: " + str(game.level), 5, Colors.WHITE.value,
+                                      Colors.BLACK.value)
+        text_help = text_drop_shadow(small_font, "<ESC>: Menu", 5, Colors.WHITE.value, Colors.BLACK.value)
+        text_next_piece = text_drop_shadow(small_font, "Next:", 5, pygame.color.Color("red"),
+                                           pygame.color.Color("black"))
         screen.blit(text_score, [0, 0])
         screen.blit(text_level, [0, text_score.get_size()[1] * 1.5])
         screen.blit(text_help, [0, SCREEN_HEIGHT - text_help.get_size()[1]])
+        screen.blit(text_next_piece, [next_rect.x, next_rect.y - text_next_piece.get_height()])
 
         # Draw menu
         if main_menu.is_enabled():
@@ -554,7 +596,7 @@ show_ghost = False
 fullscreen = False
 
 MUSIC_DEFAULT = 6
-SFX_DEFAULT = 5
+SFX_DEFAULT = 7
 
 RESOLUTIONS = [('Full Screen Resolution', SCREEN_WIDTH, SCREEN_HEIGHT),
                ('800x600', 800, 600),
@@ -564,8 +606,19 @@ RESOLUTIONS = [('Full Screen Resolution', SCREEN_WIDTH, SCREEN_HEIGHT),
                ('1920x1080', 1920, 1080),
                ('2560x1440', 2560, 1440)]
 screen = None
+alpha_surface = None
 small_font = pygame.font.SysFont('Calibri', int(SCREEN_WIDTH * 0.02), True, False)
 large_font = pygame.font.SysFont('Calibri', int(SCREEN_WIDTH * 0.1), True, False)
+
+
+def prepare_backgrounds():
+    return [pygame.transform.scale(pygame.image.load('images/bg1.jpg'), (SCREEN_WIDTH, SCREEN_HEIGHT)),
+            pygame.transform.scale(pygame.image.load('images/bg2.jpg'), (SCREEN_WIDTH, SCREEN_HEIGHT)),
+            pygame.transform.scale(pygame.image.load('images/bg3.jpg'), (SCREEN_WIDTH, SCREEN_HEIGHT)),
+            pygame.transform.scale(pygame.image.load('images/bg4.jpg'), (SCREEN_WIDTH, SCREEN_HEIGHT))]
+
+
+bg = prepare_backgrounds()
 
 if __name__ == '__main__':
     main()
