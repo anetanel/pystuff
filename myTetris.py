@@ -7,8 +7,9 @@ TODO:
 * Use backgrounds:
     Make Play field semi-transparent - Done
     Resize bg to fit screen - Done
-* Change music tempo
-* Add new music?
+* Change music tempo - Done
+* Add new music? - Done
+* Animate line break
 """
 
 import random
@@ -85,6 +86,7 @@ class Tetris:
     y = 0
 
     def __init__(self, width, height):
+        self.trouble = False
         self.block_size = int(SCREEN_WIDTH * 0.02)
         self.score = 0
         self.state = GameState.RUNNING
@@ -180,6 +182,16 @@ class Tetris:
         self.new_figure()
         if self.intersects():
             self.state = GameState.GAME_OVER
+        if sum(x.count(Colors.WHITE) for x in self.field) < self.width*self.height//2:
+            if not self.trouble:
+                self.trouble = True
+                mixer.music.load(fast_music[current_music])
+                mixer.music.play(-1)
+        else:
+            if self.trouble:
+                self.trouble = False
+                mixer.music.load(music[current_music])
+                mixer.music.play(-1)
 
     def break_lines(self):
         lines = 0
@@ -190,7 +202,16 @@ class Tetris:
                 for i1 in range(i, 1, -1):
                     self.field[i1] = self.field[i1 - 1].copy()
         self.score += lines ** 2
-        self.level = self.score // 3 + 1
+        current_level = self.level
+        self.level = self.score // 2 + 1
+        if self.level != current_level:
+            global current_music
+            current_music += 1
+            if self.trouble:
+                mixer.music.load(fast_music[current_music % len(music)])
+            else:
+                mixer.music.load(music[current_music % len(music)])
+            mixer.music.play(loops=-1)
 
     def resize(self):
         self.block_size = int(SCREEN_WIDTH * 0.02)
@@ -201,6 +222,7 @@ class Tetris:
 
 
 def new_game():
+    mixer.music.load(music[0])
     mixer.music.play(loops=-1)
     return Tetris(width=10, height=20)
 
@@ -404,8 +426,13 @@ def main():
         counter += 1
         if counter > 100000:
             counter = 0
+        # print(sum(x.count(Colors.WHITE) for x in game.field))
+        # if game.trouble:
+        #     print(f"{current_music} - trouble...")
+        # else:
+        #     print(f"{current_music} - all good!")
 
-        if (counter % (fps // game.level) == 0 or pressing_down) and not main_menu.is_enabled():
+        if (counter % (fps // game.level // 2) == 0 or pressing_down) and not main_menu.is_enabled():
             game.move(Direction.DOWN)
 
         events = pygame.event.get()
@@ -555,7 +582,17 @@ __email__ = 'netanel.attali@gmail.com'
 __title__ = 'myTetris'
 
 pygame.init()
-mixer.music.load('sound/tetris-music.mp3')
+
+music = ['sound/tetris-music.mp3',
+         'sound/tetris-music-1.mp3',
+         'sound/tetris-music-2.mp3']
+
+fast_music = ['sound/tetris-music-fast.mp3',
+              'sound/tetris-music-1-fast.mp3',
+              'sound/tetris-music-2-fast.mp3']
+current_music = 0
+mixer.music.load(music[current_music])
+
 sfx = {
     'move': mixer.Sound('sound/move.mp3'),
     'rotate': mixer.Sound('sound/rotate.mp3'),
