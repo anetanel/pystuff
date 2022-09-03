@@ -93,6 +93,8 @@ class Tetris:
         self.height = height
         self.width = width
         self.field = [[Colors.WHITE] * width for _ in range(height)]
+        self.field_size = width*height
+        self.field_full = 0
         self.figure = None
         self.next_figure = Figure()
         self.level = 1
@@ -182,7 +184,8 @@ class Tetris:
         self.new_figure()
         if self.intersects():
             self.state = GameState.GAME_OVER
-        if sum(x.count(Colors.WHITE) for x in self.field) < self.width*self.height//2:
+        self.field_full = self.field_size - sum(x.count(Colors.WHITE) for x in self.field)
+        if self.field_full > self.field_size // 2:
             if not self.trouble:
                 self.trouble = True
                 mixer.music.load(fast_music[current_music])
@@ -203,7 +206,7 @@ class Tetris:
                     self.field[i1] = self.field[i1 - 1].copy()
         self.score += lines ** 2
         current_level = self.level
-        self.level = self.score // 2 + 1
+        self.level = self.score // 10 + 1
         if self.level != current_level:
             global current_music
             current_music += 1
@@ -552,17 +555,22 @@ def main():
         if game.state == GameState.PAUSE:
             text_pause = large_font.render("PAUSE", True, Colors.BLACK.value, Colors.GRAY.value)
             screen.blit(text_pause, text_pause.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)))
-        text_score = text_drop_shadow(small_font, "Score: " + str(game.score), 5, Colors.WHITE.value,
+        text_score = text_drop_shadow(small_font, "Score: " + str(game.score), 3, Colors.WHITE.value,
                                       Colors.BLACK.value)
-        text_level = text_drop_shadow(small_font, "Level: " + str(game.level), 5, Colors.WHITE.value,
+        text_level = text_drop_shadow(small_font, "Level: " + str(game.level), 3, Colors.WHITE.value,
                                       Colors.BLACK.value)
-        text_help = text_drop_shadow(small_font, "<ESC>: Menu", 5, Colors.WHITE.value, Colors.BLACK.value)
-        text_next_piece = text_drop_shadow(small_font, "Next:", 5, pygame.color.Color("red"),
+        text_help = text_drop_shadow(small_font, "<ESC>: Menu", 3, Colors.WHITE.value, Colors.BLACK.value)
+        text_next_piece = text_drop_shadow(small_font, "Next:", 3, pygame.color.Color("red3"),
                                            pygame.color.Color("black"))
+        text_state = text_drop_shadow(small_font,
+                                      f"{game.field_full} / {game.field_size}",
+                                      3, pygame.color.Color("red4") if game.trouble else pygame.color.Color("green3"),
+                                      pygame.color.Color("black"))
         screen.blit(text_score, [0, 0])
         screen.blit(text_level, [0, text_score.get_size()[1] * 1.5])
         screen.blit(text_help, [0, SCREEN_HEIGHT - text_help.get_size()[1]])
         screen.blit(text_next_piece, [next_rect.x, next_rect.y - text_next_piece.get_height()])
+        screen.blit(text_state, next_rect.bottomleft)
 
         # Draw menu
         if main_menu.is_enabled():
@@ -576,8 +584,8 @@ def main():
     pygame.quit()
 
 
-__version__ = '0.1'
-__author__ = 'Netanel Attali'
+__version__ = '0.2'
+__author__ = 'Netanel Attali (2022)'
 __email__ = 'netanel.attali@gmail.com'
 __title__ = 'myTetris'
 
